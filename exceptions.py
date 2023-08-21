@@ -19,28 +19,10 @@ class EmptyResponseError(Exception):
     Либо нет обоих ключей.
     """
 
-    pass
-
-
-class UnknownHomeworkStatusError(Exception):
-    """Исключение для неизвестного статуса домашней работы."""
-
-    pass
-
-
-class MissingKeyError(Exception):
-    """Ошибка при отсутствии ключа в ответе API."""
-
-    pass
-
-
-class EnvVarMissingError(Exception):
-    """Ошибка отстутсвия переменных окружения."""
-
-    pass
-
 
 class APICallError(Exception):
     """Исключение для статуса отличного от 200."""
 
-    pass
+
+class APIConnectionError(Exception):
+    """Исключение, возникающее при ошибке подключения к API."""
