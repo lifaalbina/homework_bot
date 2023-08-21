@@ -39,14 +39,12 @@ def check_tokens() -> bool:
     missing_tokens = ([token for token in checked_constants
                        if globals()[token] is None or globals()[token] == ''])
     if len(missing_tokens) != 0:
-        missing_tokens_str = (', '.join(f"'{token}'"
+        missing_tokens_str = (', '.join(f'{token}'
                                         for token in missing_tokens))
         logging.critical(f'Отсутствует/ют переменные окружения: '
                          f'{missing_tokens_str}')
         sys.exit('Некоторые переменные окружение недоступны. '
                  'Подробности в логах. Продолжение работы невозможно.')
-    else:
-        return True
 
 
 def send_message(bot: telegram.Bot, message: str) -> None:
