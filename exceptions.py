@@ -11,15 +11,6 @@
 """
 
 
-class EmptyResponseError(Exception):
-    """
-    Пустой ответ от API.
-
-    Либо нет ключа homeworks, либо нет ключа current_date.
-    Либо нет обоих ключей.
-    """
-
-
 class APICallError(Exception):
     """Исключение для статуса отличного от 200."""
 

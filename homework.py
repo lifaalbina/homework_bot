@@ -9,7 +9,7 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
-from exceptions import APICallError, APIConnectionError, EmptyResponseError
+from exceptions import APICallError, APIConnectionError
 
 load_dotenv()
 
@@ -36,13 +36,14 @@ def check_tokens() -> bool:
         'TELEGRAM_TOKEN',
         'TELEGRAM_CHAT_ID',
     )
-    missing_tokens = ([token for token in checked_constants
-                       if globals()[token] is None or globals()[token] == ''])
-    if len(missing_tokens) != 0:
+    missing_tokens = [token for token in checked_constants
+                      if not globals()[token]]
+    if missing_tokens:
         missing_tokens_str = (', '.join(f'{token}'
                                         for token in missing_tokens))
-        logging.critical(f'Отсутствует/ют переменные окружения: '
-                         f'{missing_tokens_str}')
+        logging.critical(
+            f'Отсутствует/ют переменные окружения: {missing_tokens_str}'
+        )
         sys.exit('Некоторые переменные окружение недоступны. '
                  'Подробности в логах. Продолжение работы невозможно.')
 
@@ -70,12 +71,15 @@ def get_api_answer(timestamp: int) -> dict:
         response = requests.get(ENDPOINT, headers=HEADERS, params=payload)
 
     except requests.exceptions.RequestException as error:
-        raise APIConnectionError(f'При подключении к API возникла ошибка: '
-                                 f'{error}')
+        request_info = f'URL: {ENDPOINT}, Параметры: {payload}'
+        raise APIConnectionError(
+            f'При подключении к API возникла ошибка: {error}, {request_info}'
+        ) from error
 
     if response.status_code != HTTPStatus.OK:
-        raise APICallError(f'Статус-код ответа не 200 - '
-                           f'{response.status_code}')
+        raise APICallError(
+            f'Статус-код ответа не 200 - {response.status_code}'
+        )
     logging.info('Успешное получение ответа от API.')
     return response.json()
 
@@ -93,13 +97,13 @@ def check_response(response: dict) -> list:
     if not isinstance(response, dict):
         raise TypeError(f'Ответ API не является словарем - {type(response)}')
 
+    if 'homeworks' not in response:
+        raise KeyError('Ожидаемый ключ отсутствует.')
+
     homeworks = response.get('homeworks')
     if not isinstance(homeworks, list):
         raise TypeError(f'Значение ключа "homeworks" не является списком - '
                         f'{type(homeworks)}')
-
-    if 'homeworks' not in response:
-        raise EmptyResponseError('Пустой ответ от API.')
     return homeworks
 
 
@@ -118,9 +122,9 @@ def parse_status(homework: dict) -> str:
         raise KeyError('Отсутствует ключ "homework_name" в ответе API')
 
     if homework_status not in HOMEWORK_VERDICTS:
-        error_message = f'Неизвестный статус работы - {homework_status}'
-        raise ValueError(f'Неизвестный статус работы'
-                         f'- {error_message}')
+        raise ValueError(
+            f'Неизвестный статус работы- {homework_status}'
+        )
 
     verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
@@ -131,28 +135,31 @@ def main():
     check_tokens()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    previous_message = None
+    previous_message = ''
 
     while True:
         try:
             response = get_api_answer(timestamp)
-            homework = check_response(response)
-            if not homework:
+            homeworks = check_response(response)
+            if not homeworks:
                 logging.debug('В ответе отсутствуют новые статусы')
                 continue
-            message = parse_status(homework[0])
+            message = parse_status(homeworks[0])
             if message != previous_message:
                 send_message(bot, message)
                 previous_message = message
-                timestamp = response.get('current_date', timestamp)
+            else:
+                logging.info('Получено повторяющееся сообщение.')
+            timestamp = response.get('current_date', timestamp)
         except telegram.error.TelegramError as error:
             logging.error(f'Ошибка отправки сообщения в Telegram: {error}')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            logging.error(error)
+            logging.error(error, exc_info=True)
             if message != previous_message:
                 with suppress(telegram.error.TelegramError):
                     send_message(bot, message)
+                    previous_message = message
         finally:
             time.sleep(RETRY_PERIOD)
 
